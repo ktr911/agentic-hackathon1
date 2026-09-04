@@ -1,0 +1,6 @@
+.venv
+.git
+.claude
+.rulesync
+__pycache__
+*.pyc
