@@ -159,7 +159,10 @@ DEPLOY_STATUS=${PIPESTATUS[0]}
 set -e
 [[ ${DEPLOY_STATUS} -eq 0 ]] || fail "Agent Runtime のデプロイに失敗しました。ログ: ${LOG_FILE}"
 
-AGENT_ENGINE_RESOURCE="$(grep -Eo "projects/[0-9]+/locations/${REGION}/reasoningEngines/[0-9]+" "${LOG_FILE}" | tail -n 1 || true)"
+AGENT_ENGINE_RESOURCE="$(grep -Eo "projects/[A-Za-z0-9-]+/locations/${REGION}/reasoningEngines/[0-9]+" "${LOG_FILE}" | tail -n 1 || true)"
+if [[ -z "${AGENT_ENGINE_RESOURCE}" && -n "${EXISTING_RESOURCE:-}" ]]; then
+  AGENT_ENGINE_RESOURCE="${EXISTING_RESOURCE}"
+fi
 [[ -n "${AGENT_ENGINE_RESOURCE}" ]] || fail "デプロイ結果から Agent Runtime のリソース名を取得できませんでした。"
 printf '%s\n' "${AGENT_ENGINE_RESOURCE}" > "${RESOURCE_FILE}"
 
