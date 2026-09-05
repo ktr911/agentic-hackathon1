@@ -201,6 +201,63 @@ function appendResponseText(messageElement, text) {
   content.append(paragraph);
 }
 
+function renderRouteSuggestions(messageElement, text) {
+  if (!text || messageElement.querySelector(".route-suggestions")) return;
+
+  const hasRouteA = text.includes("ルートA") || text.includes("コースA");
+  const hasRouteB = text.includes("ルートB") || text.includes("コースB");
+  const hasRouteC = text.includes("ルートC") || text.includes("コースC");
+
+  if (!hasRouteA && !hasRouteB && !hasRouteC) return;
+
+  const container = document.createElement("div");
+  container.className = "route-suggestions";
+
+  const label = document.createElement("p");
+  label.className = "suggestion-label";
+  label.innerHTML = "<span>👉</span> 気になるルートを選択して次の詳細へ進む:";
+  container.append(label);
+
+  const chips = document.createElement("div");
+  chips.className = "suggestion-chips";
+
+  const options = [];
+  if (hasRouteA) {
+    options.push({
+      label: "🚩 ルートA（パノラマ絶景）の詳細へ",
+      prompt: "ルートAの詳細なタイムラインと見どころを教えて",
+    });
+  }
+  if (hasRouteB) {
+    options.push({
+      label: "🌿 ルートB（湧水・カフェ）の詳細へ",
+      prompt: "ルートBの湧水カフェと癒やしプランを詳しく教えて",
+    });
+  }
+  if (hasRouteC) {
+    options.push({
+      label: "🏛️ ルートC（歴史・ジオ）の詳細へ",
+      prompt: "ルートCの歴史古道と切通しプランを詳しく教えて",
+    });
+  }
+
+  for (const opt of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "suggestion-chip-btn";
+    btn.textContent = opt.label;
+    btn.addEventListener("click", () => {
+      if (state.busy) return;
+      sendMessage(opt.prompt);
+    });
+    chips.append(btn);
+  }
+
+  container.append(chips);
+  messageElement.querySelector(".message-content").append(container);
+  scrollToLatest();
+}
+
 const progressStages = [
   ["geology", "地質を調査"],
   ["tourism", "観光を調査"],
@@ -499,14 +556,18 @@ async function sendMessage(message) {
     if (!response.ok) throw new Error(`送信に失敗しました (${response.status})`);
 
     await consumeSse(response, (event) => handleEvent(event, assistantMessage));
+    const allText = Array.from(assistantMessage.querySelectorAll(".response-text"))
+      .map((el) => el.textContent)
+      .join("\n");
     if (
       !assistantMessage
         .querySelector(".message-content")
         .querySelector(".response-text, .map-card, img")
     ) {
       appendResponseText(assistantMessage, "処理が完了しました。");
+    } else {
+      renderRouteSuggestions(assistantMessage, allText);
     }
-    assistantMessage.querySelector(".message-meta").textContent = "調査チーム";
     setConnection("接続済み");
   } catch (error) {
     const target = assistantMessage || createMessage("assistant");

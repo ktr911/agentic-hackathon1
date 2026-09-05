@@ -9,12 +9,14 @@ from google.genai import types
 from ..config import IMAGE_MODEL
 from ..geology.tools import get_mock_geology_report
 from ..tour.tools import get_mock_tourism_report
+from ..tour.tools import plan_tour_route
 
 
 def create_mock_map_points(
     location: str,
     latitude: float | None = None,
     longitude: float | None = None,
+    selected_route_id: str | None = None,
 ) -> dict[str, object]:
     """地質・観光のモック調査地点を、クライアント表示用にまとめます。
 
@@ -22,12 +24,23 @@ def create_mock_map_points(
         location: 調査対象の地域名。
         latitude: クライアントから渡された中心地点の緯度。
         longitude: クライアントから渡された中心地点の経度。
+        selected_route_id: 選択されたルートID（"A", "B", "C"など）。
     """
     geology = get_mock_geology_report(location, latitude, longitude)
-    tourism = get_mock_tourism_report(location, latitude, longitude)
+    if selected_route_id:
+        tourism = plan_tour_route(
+            location=location,
+            latitude=latitude,
+            longitude=longitude,
+            selected_route_id=selected_route_id,
+        )
+    else:
+        tourism = get_mock_tourism_report(location, latitude, longitude)
+
     return {
         "is_mock": True,
         "location": location,
+        "selected_route_id": selected_route_id,
         "map_points": [
             *geology["map_points"],
             *tourism["map_points"],

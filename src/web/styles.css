@@ -685,6 +685,56 @@ button {
   border: 0;
 }
 
+/* Route Suggestions */
+.route-suggestions {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(23, 79, 67, 0.05);
+  border: 1px dashed rgba(23, 79, 67, 0.25);
+}
+
+.suggestion-label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--forest);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggestion-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid var(--forest);
+  border-radius: 999px;
+  background: white;
+  color: var(--forest);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 140ms ease;
+}
+
+.suggestion-chip-btn:hover {
+  background: var(--forest);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.suggestion-chip-btn:active {
+  transform: translateY(0);
+}
+
 @media (min-width: 760px) {
   .app-shell {
     min-height: calc(100dvh - 32px);
