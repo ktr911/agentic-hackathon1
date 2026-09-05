@@ -358,8 +358,11 @@ function updateResearchProgress(event, messageElement) {
     if (response.name === "tourism_research_agent") {
       setProgressStage(messageElement, "tourism", "done", "観光レポートを受け取りました");
     }
-    if (response.name === "create_mock_map_points") {
-      setProgressStage(messageElement, "integration", "done", "解説と5地点を整理しました");
+    if (
+      response.name === "create_mock_map_points" ||
+      response.name === "create_map_points"
+    ) {
+      setProgressStage(messageElement, "integration", "done", "解説と地点を整理しました");
     }
     if (response.name === "generate_image") {
       const succeeded = response.response?.status === "success";
@@ -372,7 +375,10 @@ function updateResearchProgress(event, messageElement) {
     }
   }
 
-  if (callNames.has("create_mock_map_points")) {
+  if (
+    callNames.has("create_mock_map_points") ||
+    callNames.has("create_map_points")
+  ) {
     setProgressStage(messageElement, "integration", "active", "2つの調査結果を関連付け中");
     setProgressHeadline(
       messageElement,
@@ -428,7 +434,7 @@ function renderMap(points, messageElement) {
   card.className = "map-card";
   const header = document.createElement("div");
   header.className = "map-header";
-  header.innerHTML = "<strong>調査地点</strong><span>MOCK MAP</span>";
+  header.innerHTML = "<strong>調査地点</strong><span>GEO & TOUR MAP</span>";
   const map = document.createElement("div");
   map.className = "mock-map";
   const legend = document.createElement("ol");
@@ -481,7 +487,8 @@ async function handleEvent(event, messageElement) {
     const functionResponse = part.functionResponse || part.function_response;
     if (
       isRootEvent &&
-      functionResponse?.name === "create_mock_map_points" &&
+      (functionResponse?.name === "create_map_points" ||
+        functionResponse?.name === "create_mock_map_points") &&
       Array.isArray(functionResponse.response?.map_points)
     ) {
       renderMap(functionResponse.response.map_points, messageElement);

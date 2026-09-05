@@ -4,6 +4,7 @@ from google.adk.agents import Agent
 
 from ..config import MODEL
 from .tools import get_mock_tourism_report
+from .tools import get_tourism_report
 from .tools import plan_tour_route
 from .tools import suggest_geo_tour_routes
 
@@ -30,9 +31,13 @@ tourism_research_agent = Agent(
         "     - **【ルートB】**（大地の恵み・湧水・段丘カフェなど）：特徴、主な立ち寄り先、所要時間、難易度\n"
         "     - **【ルートC】**（歴史古道・切通し・ジオカルチャーなど）：特徴、主な立ち寄り先、所要時間、難易度\n"
         "   - **◆ 次のステップへの案内（ルート選択の促し）**:\n"
-        "     ユーザーが次の行動へ進めるよう、「気になるルートを教えてください（例: 『ルートAを詳しく』『ルートBのカフェ巡りで行きたい』など）」と促し、選んだルートに応じて詳細なタイムラインや準備事項を展開できることを案内してください。\n"
-        "4. 本データおよび地図地点が動作確認用のモック（シミュレーション）情報であることを簡潔に明記してください。"
+        "     ユーザーが次の行動へ進めるよう、「気になるルートを教えてください（例: 『ルートAを詳しく』『ルートBのカフェ巡りで行きたい』など）」と促し、選んだルートに応じて詳細なタイムラインや準備事項を展開できることを案内してください。"
     ),
-    tools=[suggest_geo_tour_routes, plan_tour_route, get_mock_tourism_report],
+    tools=[
+        suggest_geo_tour_routes,
+        plan_tour_route,
+        get_tourism_report,
+        get_mock_tourism_report,
+    ],
     mode="single_turn",
 )
