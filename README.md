@@ -1,0 +1,45 @@
+# Agentic Hackathon
+
+地質情報と観光情報を組み合わせ、地域の解説、地図ピン、補助画像を返す
+Google ADK v2 ベースのエージェントアプリです。
+
+## エージェント構成
+
+```text
+src/agent/
+├── agent.py          # ADKの読み込み口
+├── config.py         # 共通のモデル設定
+├── root/             # 全体をまとめるオーケストレーター
+│   ├── agent.py
+│   └── tools.py      # 地図データ統合・画像生成
+├── geology/          # 地質調査エージェント
+│   ├── agent.py
+│   └── tools.py      # 地質調査ツール
+└── tour/             # 観光調査エージェント
+    ├── agent.py
+    └── tools.py      # 観光調査ツール
+```
+
+`root_agent` が地質・観光の2エージェントを呼び出し、両方の結果を関連付けて
+一つの回答にまとめます。現在の調査結果と地図地点は動作確認用のモックです。
+
+## Webクライアント
+
+`src/web` にモバイル向けクライアントがあります。送信時刻と、許可された場合は
+現在位置をエージェントへ渡し、調査の進捗、地図ピン、生成画像を表示します。
+
+## ローカル起動
+
+Python 3.12、`uv`、ADCを用意し、Vertex AIの環境変数を設定して起動します。
+
+```bash
+export GOOGLE_GENAI_USE_VERTEXAI=TRUE
+export GOOGLE_CLOUD_PROJECT=your-project-id
+export GOOGLE_CLOUD_LOCATION=global
+
+uvx --from google-adk==2.8.0 adk web --host 0.0.0.0 --port 8080 src
+python -m http.server 5173 --directory src/web
+```
+
+- モバイルWeb: <http://localhost:5173>
+- ADK Web UI: <http://localhost:8080/dev-ui/>

@@ -1,4 +1,4 @@
-"""ADK agent application package."""
+"""ADK agent team package."""
 
 from .agent import app
 from .agent import geology_research_agent
