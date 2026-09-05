@@ -1,4 +1,10 @@
-const API_BASE = `${window.location.protocol}//${window.location.hostname}:8080`;
+const queryApiBase = new URLSearchParams(window.location.search).get("api");
+const API_BASE =
+  window.__FIELDNOTE_API_BASE__ ||
+  queryApiBase ||
+  (window.location.port === "5173"
+    ? `${window.location.protocol}//${window.location.hostname}:8080`
+    : window.location.origin);
 const APP_NAME = "agent";
 const USER_ID_KEY = "fieldnote-user-id";
 
@@ -252,6 +258,7 @@ function setProgressStage(messageElement, stage, status, detail) {
 
 function updateResearchProgress(event, messageElement) {
   const parts = event.content?.parts || [];
+  const artifactDelta = event.actions?.artifactDelta || event.actions?.artifact_delta || {};
   const functionCalls = parts
     .map((part) => part.functionCall || part.function_call)
     .filter(Boolean);
@@ -332,7 +339,7 @@ function updateResearchProgress(event, messageElement) {
     );
   }
 
-  if (event.actions?.artifactDelta && Object.keys(event.actions.artifactDelta).length) {
+  if (Object.keys(artifactDelta).length) {
     setProgressStage(messageElement, "image", "done", "補助画像ができました");
   }
 
@@ -409,8 +416,13 @@ function renderMap(points, messageElement) {
 }
 
 async function handleEvent(event, messageElement) {
-  if (event.errorCode || event.error) {
-    throw new Error(event.errorMessage || event.error || "エージェントでエラーが発生しました");
+  if (event.errorCode || event.error_code || event.error) {
+    throw new Error(
+      event.errorMessage ||
+        event.error_message ||
+        event.error ||
+        "エージェントでエラーが発生しました",
+    );
   }
 
   updateResearchProgress(event, messageElement);
@@ -435,7 +447,8 @@ async function handleEvent(event, messageElement) {
     }
   }
 
-  for (const [filename, version] of Object.entries(event.actions?.artifactDelta || {})) {
+  const artifactDelta = event.actions?.artifactDelta || event.actions?.artifact_delta || {};
+  for (const [filename, version] of Object.entries(artifactDelta)) {
     await renderArtifact(filename, version, messageElement);
   }
   scrollToLatest();

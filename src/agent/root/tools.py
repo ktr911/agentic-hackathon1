@@ -6,7 +6,7 @@ from google import genai
 from google.adk.tools import ToolContext
 from google.genai import types
 
-from ..config import IMAGE_MODEL
+from ..config import IMAGE_MODEL, MODEL_LOCATION
 from ..geology.tools import get_mock_geology_report
 from ..tour.tools import get_mock_tourism_report
 
@@ -42,7 +42,7 @@ async def generate_image(prompt: str, tool_context: ToolContext) -> dict[str, ob
         prompt: 生成したい画像の具体的な説明。
         tool_context: ADKが注入する現在のツール実行コンテキスト。
     """
-    client = genai.Client()
+    client = genai.Client(vertexai=True, location=MODEL_LOCATION)
     try:
         response = await client.aio.models.generate_content(
             model=IMAGE_MODEL,

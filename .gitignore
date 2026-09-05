@@ -6,3 +6,5 @@
 __pycache__/
 *.py[cod]
 .adk/
+.deploy/
+src/agent_tmp*/
