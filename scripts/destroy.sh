@@ -34,7 +34,7 @@ fi
 
 if [[ -s "${RESOURCE_FILE}" ]]; then
   AGENT_ENGINE_RESOURCE="$(tr -d '[:space:]' < "${RESOURCE_FILE}")"
-  if [[ ! "${AGENT_ENGINE_RESOURCE}" =~ ^projects/[0-9]+/locations/${REGION}/reasoningEngines/[0-9]+$ ]]; then
+  if [[ ! "${AGENT_ENGINE_RESOURCE}" =~ ^projects/[A-Za-z0-9-]+/locations/${REGION}/reasoningEngines/[0-9]+$ ]]; then
     fail "不正な Agent Runtime リソース名です: ${AGENT_ENGINE_RESOURCE}"
   fi
 
