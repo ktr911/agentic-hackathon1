@@ -7,32 +7,53 @@ from google.adk.tools import ToolContext
 from google.genai import types
 
 from ..config import IMAGE_MODEL, MODEL_LOCATION
-from ..geology.tools import get_mock_geology_report
-from ..tour.tools import get_mock_tourism_report
+from ..geology.tools import get_geology_report
+from ..tour.tools import get_tourism_report, plan_tour_route
+
+
+def create_map_points(
+    location: str,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    selected_route_id: str | None = None,
+) -> dict[str, object]:
+    """地質・観光の調査地点を、クライアント表示用にまとめます。
+
+    Args:
+        location: 調査対象の地域名。
+        latitude: クライアントから渡された中心地点の緯度。
+        longitude: クライアントから渡された中心地点の経度。
+        selected_route_id: 選択されたルートID（"A", "B", "C"など）。
+    """
+    geology = get_geology_report(location, latitude, longitude)
+    if selected_route_id:
+        tourism = plan_tour_route(
+            location=location,
+            latitude=latitude,
+            longitude=longitude,
+            selected_route_id=selected_route_id,
+        )
+    else:
+        tourism = get_tourism_report(location, latitude, longitude)
+
+    return {
+        "location": location,
+        "selected_route_id": selected_route_id,
+        "map_points": [
+            *geology.get("map_points", []),
+            *tourism.get("map_points", []),
+        ],
+    }
 
 
 def create_mock_map_points(
     location: str,
     latitude: float | None = None,
     longitude: float | None = None,
+    selected_route_id: str | None = None,
 ) -> dict[str, object]:
-    """地質・観光のモック調査地点を、クライアント表示用にまとめます。
-
-    Args:
-        location: 調査対象の地域名。
-        latitude: クライアントから渡された中心地点の緯度。
-        longitude: クライアントから渡された中心地点の経度。
-    """
-    geology = get_mock_geology_report(location, latitude, longitude)
-    tourism = get_mock_tourism_report(location, latitude, longitude)
-    return {
-        "is_mock": True,
-        "location": location,
-        "map_points": [
-            *geology["map_points"],
-            *tourism["map_points"],
-        ],
-    }
+    """後方互換用エイリアス"""
+    return create_map_points(location, latitude, longitude, selected_route_id)
 
 
 async def generate_image(prompt: str, tool_context: ToolContext) -> dict[str, object]:

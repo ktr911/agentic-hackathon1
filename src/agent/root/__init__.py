@@ -1,7 +1,11 @@
 """Root orchestration agent package."""
 
 from .agent import root_agent
-from .tools import create_mock_map_points
-from .tools import generate_image
+from .tools import create_map_points, create_mock_map_points, generate_image
 
-__all__ = ["create_mock_map_points", "generate_image", "root_agent"]
+__all__ = [
+    "create_map_points",
+    "create_mock_map_points",
+    "generate_image",
+    "root_agent",
+]

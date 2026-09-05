@@ -6,7 +6,6 @@ from .geology.agent import geology_research_agent
 from .root.agent import root_agent
 from .tour.agent import tourism_research_agent
 
-
 app = App(name="agent", root_agent=root_agent)
 
 __all__ = [

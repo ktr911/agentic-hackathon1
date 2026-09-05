@@ -1,21 +1,44 @@
-"""Tourism research agent definition."""
+"""Tourism research agent definition with geology-linked tour routing."""
 
 from google.adk.agents import Agent
 
 from ..config import MODEL
-from .tools import get_mock_tourism_report
-
+from .tools import (
+    get_mock_tourism_report,
+    get_tourism_report,
+    plan_tour_route,
+    suggest_geo_tour_routes,
+)
 
 tourism_research_agent = Agent(
     name="tourism_research_agent",
     model=MODEL,
-    description="観光地、旅行プラン、地域の見どころの調査を担当します。",
+    description="地質・地形の特徴に紐づいた見どころの選定、複数ルートの提案（サジェスト）、およびモデルコースの策定を担当するジオツーリズム専門エージェントです。",
     instruction=(
-        "あなたは観光調査担当です。get_mock_tourism_report を必ず1回呼び、"
-        "クライアントコンテキストに緯度・経度があればツールにも渡してください。"
-        "その結果だけを日本語で簡潔に整理してください。"
-        "結果がモックデータであり、実際の観光情報ではないことを明記してください。"
+        "あなたは地質と観光が融合した『ジオツーリズム』の専門トラベルプランナーです。"
+        "その地域の大地の成り立ち（地形・地層・断層・湧水・火山など）と観光体験を密接に結びつけ、"
+        "ユーザーが好みに応じて選べる複数のルート提案や見どころのサジェストを行ってください。\n\n"
+        "【遂行手順】\n"
+        "1. 対象地域、緯度・経度、ユーザーの要望、および地質調査結果（火山、段丘、砂礫層、湧水、断層など）を確認します。\n"
+        "2. ユーザーの目的に応じてツールを呼び出します：\n"
+        "   - **初回提案や幅広いルート比較の場合**:\n"
+        "     `suggest_geo_tour_routes` を呼び出し、地質特徴に紐づいた複数のルート候補（ルートA・B・Cなど）を取得します。\n"
+        "   - **特定のルート（ルートA/B/C）の詳細化や深掘りの場合**:\n"
+        "     `plan_tour_route` を呼び出し、選択されたルートの詳細タイムラインや立ち寄り先を取得します。\n"
+        "3. 得られたデータを基に、以下の構成でわかりやすく魅力的な日本語で回答を整理してください：\n"
+        "   - **◆ 大地と地域のストーリー（地質テーマ）**: なぜその地形が生まれ、どう観光や見どころに繋がっているかの解説\n"
+        "   - **◆ おすすめルートの提案・サジェスト（選択肢）**:\n"
+        "     - **【ルートA】**（パノラマ絶景・断層地形など）：特徴、主な立ち寄り先、所要時間、難易度\n"
+        "     - **【ルートB】**（大地の恵み・湧水・段丘カフェなど）：特徴、主な立ち寄り先、所要時間、難易度\n"
+        "     - **【ルートC】**（歴史古道・切通し・ジオカルチャーなど）：特徴、主な立ち寄り先、所要時間、難易度\n"
+        "   - **◆ 次のステップへの案内（ルート選択の促し）**:\n"
+        "     ユーザーが次の行動へ進めるよう、「気になるルートを教えてください（例: 『ルートAを詳しく』『ルートBのカフェ巡りで行きたい』など）」と促し、選んだルートに応じて詳細なタイムラインや準備事項を展開できることを案内してください。"
     ),
-    tools=[get_mock_tourism_report],
+    tools=[
+        suggest_geo_tour_routes,
+        plan_tour_route,
+        get_tourism_report,
+        get_mock_tourism_report,
+    ],
     mode="single_turn",
 )
