@@ -75,6 +75,7 @@ ensure_service_account "${AGENT_SA_NAME}" "Fieldnote Agent Runtime"
 ensure_service_account "${WEB_SA_NAME}" "Fieldnote Cloud Run web"
 grant_project_role "serviceAccount:${AGENT_SA}" "roles/aiplatform.user"
 grant_project_role "serviceAccount:${AGENT_SA}" "roles/logging.logWriter"
+grant_project_role "serviceAccount:${AGENT_SA}" "roles/serviceusage.serviceUsageConsumer"
 grant_project_role "serviceAccount:${WEB_SA}" "roles/aiplatform.user"
 grant_project_role "serviceAccount:${WEB_SA}" "roles/logging.logWriter"
 
