@@ -1,12 +1,6 @@
 """Tools used by the tourism research agent with geology-linked tour routing."""
 
-import json
 from typing import Any
-
-from google import genai
-from google.genai import types
-
-from ..config import MODEL
 
 
 def suggest_geo_tour_routes(
@@ -32,224 +26,27 @@ def suggest_geo_tour_routes(
     center_lat = latitude if latitude is not None else 35.0116
     center_lng = longitude if longitude is not None else 135.7681
     loc_str = location if location and location.strip() and location != "指定なし" else "指定エリア"
-    geo_str = geology_context if geology_context else "地域の段丘・地層・湧水・起伏"
+    geo_str = geology_context if geology_context else "台地・段丘・砂礫層・湧水・地形の起伏"
 
-    prompt = f"""
-あなたは日本のジオツーリズム（大地の成り立ち×観光・まち歩き）の専門トラベルプランナーです。
-対象地域: {loc_str} (中心緯度: {center_lat}, 中心経度: {center_lng})
-地域の地質的特徴: {geo_str}
+    # 地質コンテキストからキーワードを抽出してストーリーを調整
+    geo_keywords = []
+    if any(k in geo_str for k in ["堆積", "砂岩", "泥岩", "礫"]):
+        geo_keywords.append("堆積岩と砂礫層")
+    if any(k in geo_str for k in ["火山", "火成", "溶岩", "地熱", "カルデラ"]):
+        geo_keywords.append("火山性地形と地熱")
+    if any(k in geo_str for k in ["断層", "段丘", "平野", "崖"]):
+        geo_keywords.append("段丘崖と断層変位")
 
-この地域の地質・地形を活かし、旅行者がワクワクして選べる3つの異なる周遊ルート案（ルートA, ルートB, ルートC）を策定してください。
-ブラタモリ的な『大地のなぜなに（雑学）』、高低差を考慮した疲れない歩行設計（下り坂や平坦基調）、地質の恵みグルメ（ジオフード）、＋30分の寄り道スポット、写真撮影のベストアングルを含めて、
-以下のJSONフォーマットのみを出力してください。Markdownコードブロックは不要です。
+    geo_focus_tag = "・".join(geo_keywords) if geo_keywords else "大地と地層の成り立ち"
 
-{{
-  "location": "{loc_str}",
-  "region_theme": "{loc_str}の大地と観光のテーマ",
-  "base_geo_story": "この地域の大地の成り立ちがどのように景観・名水・温泉・文化に影響を与えているかの解説（150文字程度）",
-  "route_options": [
-    {{
-      "route_id": "A",
-      "title": "【ルートA】ダイナミック地形・パノラマ絶景コース",
-      "subtitle": "高台からの見晴らしと大地の起伏を巡るパノラマ散策",
-      "geo_focus": "断層崖、隆起段丘、パノラマ眺望、地層露頭",
-      "elevation_strategy": "登りはバスで高台へ、散策は緩やかな下り坂中心の省エネ設計（歩行負荷: ★★☆）",
-      "geo_story_highlight": "大地のなぜなに: なぜここに大パノラマが？ 太古の隆起運動と河川の侵食が造り出した奇跡の断崖地形",
-      "geo_gourmet": "高台テラスで味わう地場野菜ランチ＆絶景焙煎珈琲",
-      "detour_suggestion": "＋30分の寄り道: 時間があれば徒歩5分の『隠れ地層展望ベンチ』にも立ち寄り可能",
-      "photo_tip": "展望テラスから南西向き：午後の斜光で断層崖の陰影が際立ち立体的な写真が撮れます",
-      "duration": "約3時間",
-      "difficulty": "中級（下り基調・適度な散策）",
-      "transportation": "周遊バス＋徒歩（下り坂中心）",
-      "next_prompt_suggestion": "ルートAの詳細なタイムラインと見どころを教えて",
-      "spots": [
-        {{
-          "order": 1,
-          "name": "高台パノラマ展望スポット名",
-          "category": "view",
-          "terrain": "段丘最頂部（標高差を一望）",
-          "geo_point": "地形・地質に関する解説",
-          "geo_trivia": "なぜここに展望台？ 浸食に耐えた硬い岩盤が山頂部に残ったため",
-          "highlight": "大地のスケールを体感するパノラマ眺望",
-          "stay_minutes": 40,
-          "latitude": {center_lat + 0.003},
-          "longitude": {center_lng + 0.003}
-        }},
-        {{
-          "order": 2,
-          "name": "大地の露頭・地層ウォーキング小道名",
-          "category": "nature",
-          "terrain": "緩やかな下り坂の遊歩道",
-          "geo_point": "地層や岩石に関する解説",
-          "geo_trivia": "縞模様の正体: 数万年前の火山噴火と河川堆積が交互に積み重なった地層の年輪",
-          "highlight": "地層を間近に観察しながらの下り坂ウォーク",
-          "stay_minutes": 35,
-          "latitude": {center_lat + 0.001},
-          "longitude": {center_lng + 0.001}
-        }},
-        {{
-          "order": 3,
-          "name": "絶景見晴らしカフェ・飲食店名",
-          "category": "food",
-          "terrain": "中腹の平坦地（休憩に最適）",
-          "geo_point": "地形を眺めながら休憩できる解説",
-          "geo_trivia": "地形の恵み: 地下深くから引いたミネラル豊富な井戸水を使用したドリンク",
-          "highlight": "絶景スイーツとリフレッシュタイム",
-          "stay_minutes": 45,
-          "latitude": {center_lat - 0.002},
-          "longitude": {center_lng + 0.003}
-        }}
-      ]
-    }},
-    {{
-      "route_id": "B",
-      "title": "【ルートB】大地の恵み・清冽な湧水と段丘カフェコース",
-      "subtitle": "砂礫層が磨いた名水と木陰の小道に癒やされるのんびり周遊",
-      "geo_focus": "砂礫層フィルターの湧水・伏流水・温泉地熱・段丘下の平坦緑道",
-      "elevation_strategy": "段丘崖下のほぼ完全フラットな木陰ルート（階段なし・歩行負荷: ★☆☆）",
-      "geo_story_highlight": "大地のなぜなに: なぜここに湧水が？ 水を通しやすい砂礫層と通さない粘土層の境目から数十年前の雨水が湧出",
-      "geo_gourmet": "名水仕込みの手打ち蕎麦＆湧水水出しアイスコーヒー",
-      "detour_suggestion": "＋30分の寄り道: 足湯や冷水手水のある『湧水親水小公園』でのんびり涼むのがおすすめ",
-      "photo_tip": "湧水池の木道から水面越しに撮影：透明度抜群の水中植物と木漏れ日が美しく映えます",
-      "duration": "約2時間30分",
-      "difficulty": "初級（平坦・バリアフリー散策）",
-      "transportation": "徒歩（平坦小道）",
-      "next_prompt_suggestion": "ルートBの湧水カフェと癒やしプランを詳しく教えて",
-      "spots": [
-        {{
-          "order": 1,
-          "name": "清冽湧水池・親水スポット名",
-          "category": "nature",
-          "terrain": "段丘崖下の平坦地（湧水帯）",
-          "geo_point": "地下水・湧水の地質的仕組み",
-          "geo_trivia": "天然のフィルター: 富士・箱根や周辺山地の火山灰層を潜り抜けた極上の軟水",
-          "highlight": "湧水池の清涼感とマイナスイオン",
-          "stay_minutes": 40,
-          "latitude": {center_lat - 0.001},
-          "longitude": {center_lng + 0.002}
-        }},
-        {{
-          "order": 2,
-          "name": "名水仕込みの古民家カフェ・茶房名",
-          "category": "food",
-          "terrain": "水辺沿いの平坦な古民家街",
-          "geo_point": "清らかな水を用いた食文化の解説",
-          "geo_trivia": "名水の味: 硬度が低く出汁やコーヒーの香りを最大限に引き出す湧水の恩恵",
-          "highlight": "名水珈琲と季節の甘味セット",
-          "stay_minutes": 50,
-          "latitude": {center_lat - 0.003},
-          "longitude": {center_lng - 0.001}
-        }},
-        {{
-          "order": 3,
-          "name": "せせらぎ親水緑道・里山小道名",
-          "category": "view",
-          "terrain": "水路に沿ったフラットな緑道",
-          "geo_point": "水と植生が調和した地形解説",
-          "geo_trivia": "生活と地形: 段丘の湧水を水田や生活用水に引くために江戸期に拓かれた水路跡",
-          "highlight": "せせらぎの音を聞きながらの癒やし歩き",
-          "stay_minutes": 35,
-          "latitude": {center_lat + 0.001},
-          "longitude": {center_lng - 0.003}
-        }}
-      ]
-    }},
-    {{
-      "route_id": "C",
-      "title": "【ルートC】地形と人が拓いた歴史・ジオカルチャー探訪コース",
-      "subtitle": "岩盤を削った切通しや尾根の古道から人々の知恵をたどる",
-      "geo_focus": "切通し（人工地層断面）、石造文化、尾根筋の要害古道",
-      "elevation_strategy": "尾根筋の緩やかなアップダウンで歴史の起伏を体感（歩行負荷: ★★☆）",
-      "geo_story_highlight": "大地のなぜなに: なぜこの道が作られた？ 水害の多い低地を避け、硬い砂岩の尾根を切り拓いて交通路を確保した先人の知恵",
-      "geo_gourmet": "街道筋の名物力餅＆石臼挽き抹茶セット",
-      "detour_suggestion": "＋30分の寄り道: 古代の石切り場跡を望む『地学モニュメント広場』への寄り道がおすすめ",
-      "photo_tip": "切通しの両岸を見上げるローアングル：垂直に削られた岩肌と苔の陰影が大迫力で撮れます",
-      "duration": "約3時間",
-      "difficulty": "初〜中級（石畳・歴史小道）",
-      "transportation": "徒歩（一部石畳道）",
-      "next_prompt_suggestion": "ルートCの歴史古道と切通しプランを詳しく教えて",
-      "spots": [
-        {{
-          "order": 1,
-          "name": "歴史の切通し・岩壁古道名",
-          "category": "culture",
-          "terrain": "岩盤を削り抜いた切通し道",
-          "geo_point": "岩盤を削った歴史的背景と地質断面",
-          "geo_trivia": "石工のノミ跡: 固すぎず柔らかすぎない絶妙な凝灰質砂岩だからこそ人力で開通できた",
-          "highlight": "垂直な岩肌に挟まれた歴史古道の迫力",
-          "stay_minutes": 45,
-          "latitude": {center_lat + 0.003},
-          "longitude": {center_lng - 0.002}
-        }},
-        {{
-          "order": 2,
-          "name": "石造遺産・郷土資料館名",
-          "category": "culture",
-          "terrain": "門前町の緩やかな坂道",
-          "geo_point": "地元の石材利用や人々の暮らしの知恵",
-          "geo_trivia": "石材の適材適所: 寺社の石段や土台に使われた地元特有の石材（鎌倉石・安山岩等）の歴史",
-          "highlight": "地域特有の石材文化と歴史展示",
-          "stay_minutes": 40,
-          "latitude": {center_lat - 0.002},
-          "longitude": {center_lng - 0.003}
-        }},
-        {{
-          "order": 3,
-          "name": "街道名物・門前茶屋名",
-          "category": "food",
-          "terrain": "街道沿いの宿場町エリア",
-          "geo_point": "街道文化と結びついた郷土の味",
-          "geo_trivia": "旅人のオアシス: 峠越えの難所を越えた旅人を迎えた歴史ある茶屋の立地",
-          "highlight": "香ばしい名物焼き団子とお茶で一服",
-          "stay_minutes": 35,
-          "latitude": {center_lat - 0.004},
-          "longitude": {center_lng + 0.001}
-        }}
-      ]
-    }}
-  ]
-}}
-"""
-    try:
-        client = genai.Client()
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-            ),
-        )
-        if response.text:
-            data = json.loads(response.text)
-            if isinstance(data, dict) and "route_options" in data:
-                all_map_points = []
-                for ro in data["route_options"]:
-                    r_id = ro.get("route_id", "A")
-                    for sp in ro.get("spots", []):
-                        all_map_points.append({
-                            "title": f"[{r_id}-{sp.get('order', 1)}] {sp.get('name')}",
-                            "latitude": sp.get("latitude", center_lat),
-                            "longitude": sp.get("longitude", center_lng),
-                            "category": sp.get("category", "view"),
-                        })
-                data["map_points"] = all_map_points
-                data["selection_guide"] = (
-                    "お好みのルートをお選びいただけます。「ルートAを詳しく」「ルートBでのんびり行きたい」"
-                    "「ルートCの歴史スポットを教えて」とお伝えいただければ、具体的な行程や見どころをご案内します。"
-                )
-                return data
-    except Exception:
-        pass
-
-    # フォールバック（API未設定・オフライン時等でも地域に応じた動的生成）
     routes_data = [
         {
             "route_id": "A",
             "title": f"【ルートA】{loc_str} パノラマ絶景と大地体感コース",
             "subtitle": "高台からの見晴らしと大地の起伏を巡るパノラマ散策",
-            "geo_focus": "断層崖、隆起段丘、パノラマ眺望、地層露頭",
-            "elevation_strategy": "登りはバスで高台へ、散策は緩やかな下り坂中心の省エネ設計（歩行負荷: ★★☆）",
-            "geo_story_highlight": f"大地のなぜなに: なぜ{loc_str}に大パノラマが？ 太古の断層隆起と浸食作用が生んだ絶景",
+            "geo_focus": f"断層崖、隆起段丘、パノラマ眺望、{geo_focus_tag}",
+            "elevation_strategy": "登りはバス/交通機関で高台へ、散策は緩やかな下り坂中心の省エネ設計（歩行負荷: ★★☆）",
+            "geo_story_highlight": f"大地のなぜなに: なぜ{loc_str}に大パノラマが？ 太古の断層隆起と浸食作用が生んだ天然の見晴らし地形",
             "geo_gourmet": "見晴らしカフェの地場野菜ランチ＆絶景焙煎珈琲",
             "detour_suggestion": "＋30分の寄り道: 徒歩5分の『大地の展望テラスベンチ』で夕景鑑賞もおすすめ",
             "photo_tip": "展望台から南西向き：午後の光で地形の陰影が際立ちベストショットが撮れます",
@@ -275,8 +72,8 @@ def suggest_geo_tour_routes(
                     "name": f"{loc_str} 地層観察ウォーキング小道",
                     "category": "nature",
                     "terrain": "緩やかな下り坂の遊歩道",
-                    "geo_point": "砂礫層とローム層が露出した大地の断面を間近に観察",
-                    "geo_trivia": "地層の年輪: 火山噴火の火山灰と河川堆積が重なった数十万年の歴史",
+                    "geo_point": "地層が露出した大地の断面を間近に観察",
+                    "geo_trivia": "地層の年輪: 太古の火山活動や河川堆積が重なった数十万年の歴史",
                     "highlight": "地層の縞模様と大地の成り立ちを学ぶ散策",
                     "stay_minutes": 35,
                     "latitude": round(center_lat + 0.001, 5),
@@ -300,7 +97,7 @@ def suggest_geo_tour_routes(
             "route_id": "B",
             "title": f"【ルートB】{loc_str} 大地の恵み・清冽な湧水とカフェコース",
             "subtitle": "砂礫層が磨いた名水と段丘下の緑道に癒やされるのんびり散策",
-            "geo_focus": "砂礫層フィルターの湧水・伏流水・温泉地熱・平坦な親水緑道",
+            "geo_focus": "砂礫層フィルターの湧水・伏流水・平坦な親水緑道",
             "elevation_strategy": "段丘崖下のほぼ完全フラットな木陰ルート（階段なし・歩行負荷: ★☆☆）",
             "geo_story_highlight": f"大地のなぜなに: なぜここに湧水が？ 透水性の砂礫層と不透水の粘土層の境目から数十年前の雨水が噴出",
             "geo_gourmet": "名水仕込みの手打ち蕎麦＆湧水水出し珈琲",
@@ -418,7 +215,7 @@ def suggest_geo_tour_routes(
     return {
         "location": loc_str,
         "region_theme": f"{loc_str}の大地と観光の調和",
-        "base_geo_story": f"{loc_str}の地形と地層は、独自の景観や豊かな水・文化を育んできました。",
+        "base_geo_story": f"{loc_str}の地形（{geo_str}）は、独自の景観や豊かな水・文化を育んできました。",
         "route_options": routes_data,
         "map_points": all_map_points,
         "selection_guide": (
