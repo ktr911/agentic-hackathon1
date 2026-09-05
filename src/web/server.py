@@ -97,6 +97,7 @@ async def _query_agent(class_method: str, method_input: dict[str, Any]) -> Any:
 
 
 @app.get("/healthz")
+@app.get("/api/healthz")
 async def healthz() -> dict[str, Any]:
     return {
         "status": "ok",

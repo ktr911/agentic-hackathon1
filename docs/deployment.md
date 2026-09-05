@@ -51,7 +51,7 @@ gcloud auth application-default login
 3. 生成画像を保存する非公開 GCS バケットの作成
 4. ADK CLI による Agent Runtime の作成または更新
 5. Cloud Run のソースデプロイ
-6. `/healthz` と実際の Agent Runtime 呼び出しによる E2E 疎通確認
+6. `/api/healthz` と実際の Agent Runtime 呼び出しによる E2E 疎通確認
 
 初回デプロイで得た Agent Runtime リソース名は
 `.deploy/agent-engine-resource.txt` に保存され、2回目以降は同じリソースを更新します。

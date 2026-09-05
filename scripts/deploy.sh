@@ -185,7 +185,7 @@ WEB_URL="$(gcloud run services describe "${WEB_SERVICE}" \
   --format='value(status.url)')"
 
 echo "[7/8] HTTP 疎通確認を行います"
-curl --fail --silent --show-error "${WEB_URL}/healthz"
+curl --fail --silent --show-error "${WEB_URL}/api/healthz"
 echo
 
 echo "[8/8] エージェントの E2E 疎通確認を行います"
