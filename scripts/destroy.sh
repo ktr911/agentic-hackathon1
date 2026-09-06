@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PROJECT_ID="${PROJECT_ID:-zenn-hack5-i-icc}"
+PROJECT_ID="${PROJECT_ID:-agentic-ai-hackathon-test1}"
 REGION="${REGION:-asia-northeast1}"
 WEB_SERVICE="${WEB_SERVICE:-fieldnote-client}"
 AGENT_SA_NAME="${AGENT_SA_NAME:-fieldnote-agent-runtime}"

@@ -37,12 +37,16 @@ export GOOGLE_GENAI_USE_VERTEXAI=TRUE
 export GOOGLE_CLOUD_PROJECT=your-project-id
 export GOOGLE_CLOUD_LOCATION=global
 
-uvx --from google-adk==2.8.0 adk web --host 0.0.0.0 --port 8080 src
+uvx --from google-adk==2.8.0 adk web --host 0.0.0.0 --port 8080 --allow_origins http://localhost:5173 src
 python -m http.server 5173 --directory src/web
 ```
 
 - モバイルWeb: <http://localhost:5173>
 - ADK Web UI: <http://localhost:8080/dev-ui/>
+
+`--allow_origins` は Web クライアント（5173番ポート）からのブラウザ経由のリクエストを
+許可する CORS 設定です。無指定だとブラウザが `Access-Control-Allow-Origin` エラーで
+リクエストをブロックします。
 
 ## Google Cloud へデプロイ
 
@@ -55,11 +59,11 @@ gcloud auth application-default login
 ./scripts/deploy.sh
 ```
 
-既定の Google Cloud プロジェクトは `zenn-hack5-i-icc`、リージョンは
+既定の Google Cloud プロジェクトは `agentic-ai-hackathon-test1`、リージョンは
 `asia-northeast1` です。詳しくは [Google Cloud デプロイ手順](docs/deployment.md) を参照してください。
 
 ハッカソン終了後の専用リソース削除:
 
 ```bash
-CONFIRM_DESTROY=zenn-hack5-i-icc ./scripts/destroy.sh
+CONFIRM_DESTROY=agentic-ai-hackathon-test1 ./scripts/destroy.sh
 ```

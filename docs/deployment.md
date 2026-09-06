@@ -1,7 +1,7 @@
 # Google Cloud デプロイ手順
 
 Web クライアントを Cloud Run、ADK エージェントを Agent Runtime（旧称 Vertex AI
-Agent Engine）へデプロイします。既定のプロジェクトは `zenn-hack5-i-icc`、リージョンは
+Agent Engine）へデプロイします。既定のプロジェクトは `agentic-ai-hackathon-test1`、リージョンは
 東京の `asia-northeast1` です。
 
 ## 構成
@@ -23,7 +23,7 @@ Cloud Run は一般公開されます。Google Cloud の認証トークンやサ
 ## 前提条件
 
 - `gcloud` と `uv` がインストール済み
-- `zenn-hack5-i-icc` で課金が有効
+- `agentic-ai-hackathon-test1` で課金が有効
 - 実行ユーザーに API 有効化、IAM、サービスアカウント、Cloud Run、Cloud Build、
   Agent Runtime、Cloud Storage を設定できる権限がある
 - Gemini モデル `gemini-3.7-flash` と画像モデル `gemini-3.1-flash-image` を対象
@@ -61,7 +61,7 @@ gcloud auth application-default login
 ```bash
 REGION=asia-northeast1 \
 WEB_SERVICE=fieldnote-client \
-ARTIFACT_BUCKET=zenn-hack5-i-icc-fieldnote-artifacts \
+ARTIFACT_BUCKET=agentic-ai-hackathon-test1-fieldnote-artifacts \
 ./scripts/deploy.sh
 ```
 
@@ -73,12 +73,12 @@ Cloud Run URL はスクリプトの最後に表示されます。設定だけを
 
 ```bash
 gcloud run services describe fieldnote-client \
-  --project=zenn-hack5-i-icc \
+  --project=agentic-ai-hackathon-test1 \
   --region=asia-northeast1 \
   --format='value(status.url)'
 
 curl -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-  'https://asia-northeast1-aiplatform.googleapis.com/v1/projects/zenn-hack5-i-icc/locations/asia-northeast1/reasoningEngines'
+  'https://asia-northeast1-aiplatform.googleapis.com/v1/projects/agentic-ai-hackathon-test1/locations/asia-northeast1/reasoningEngines'
 ```
 
 ログは Cloud Logging のほか、デプロイ時の Agent Runtime 出力が
@@ -89,10 +89,10 @@ curl -H "Authorization: Bearer $(gcloud auth print-access-token)" \
 Cloud Run 用サーバーは、デプロイ済み Agent Runtime のリソース名を指定して起動できます。
 
 ```bash
-export GOOGLE_CLOUD_PROJECT=zenn-hack5-i-icc
+export GOOGLE_CLOUD_PROJECT=agentic-ai-hackathon-test1
 export GOOGLE_CLOUD_LOCATION=asia-northeast1
 export AGENT_ENGINE_RESOURCE='projects/PROJECT_NUMBER/locations/asia-northeast1/reasoningEngines/RESOURCE_ID'
-export ARTIFACT_BUCKET=zenn-hack5-i-icc-fieldnote-artifacts
+export ARTIFACT_BUCKET=agentic-ai-hackathon-test1-fieldnote-artifacts
 
 uv run --with-requirements src/web/requirements.txt \
   uvicorn server:app --app-dir src/web --host 0.0.0.0 --port 8080
@@ -109,7 +109,7 @@ uv run --with-requirements src/web/requirements.txt \
 - ハッカソン終了後は次のコマンドで、このスクリプトが作成した専用リソースを削除できます。
 
 ```bash
-CONFIRM_DESTROY=zenn-hack5-i-icc ./scripts/destroy.sh
+CONFIRM_DESTROY=agentic-ai-hackathon-test1 ./scripts/destroy.sh
 ```
 
 削除対象は `fieldnote-client`、保存済み Agent Runtime リソース、生成画像バケット、
