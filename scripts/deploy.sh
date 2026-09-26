@@ -16,6 +16,7 @@ STATE_DIR="${ROOT_DIR}/.deploy"
 RESOURCE_FILE="${STATE_DIR}/agent-engine-resource.txt"
 CONFIG_FILE="${STATE_DIR}/agent-engine-config.json"
 LOG_FILE="${STATE_DIR}/agent-engine-deploy.log"
+ADMIN_TOKEN_FILE="${STATE_DIR}/admin-token.txt"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -168,6 +169,10 @@ fi
 printf '%s\n' "${AGENT_ENGINE_RESOURCE}" > "${RESOURCE_FILE}"
 
 echo "[5/8] Cloud Run に Web クライアント/BFF をデプロイします"
+if [[ ! -s "${ADMIN_TOKEN_FILE}" ]]; then
+  (umask 077 && python3 -c 'import secrets; print(secrets.token_urlsafe(32))' > "${ADMIN_TOKEN_FILE}")
+fi
+ADMIN_TOKEN="$(tr -d '[:space:]' < "${ADMIN_TOKEN_FILE}")"
 gcloud run deploy "${WEB_SERVICE}" \
   --project="${PROJECT_ID}" \
   --region="${REGION}" \
@@ -176,7 +181,7 @@ gcloud run deploy "${WEB_SERVICE}" \
   --allow-unauthenticated \
   --timeout=900 \
   --max-instances=3 \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${REGION},AGENT_ENGINE_RESOURCE=${AGENT_ENGINE_RESOURCE},ARTIFACT_BUCKET=${ARTIFACT_BUCKET}" \
+  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${REGION},AGENT_ENGINE_RESOURCE=${AGENT_ENGINE_RESOURCE},ARTIFACT_BUCKET=${ARTIFACT_BUCKET},ADMIN_TOKEN=${ADMIN_TOKEN}" \
   --quiet
 
 echo "[6/8] Cloud Run URL を取得します"
@@ -247,5 +252,6 @@ fi
 
 echo "Deployment complete"
 echo "Web: ${WEB_URL}"
+echo "Admin: ${WEB_URL}/admin (トークン: ${ADMIN_TOKEN_FILE})"
 echo "Agent Runtime: ${AGENT_ENGINE_RESOURCE}"
 echo "Artifacts: gs://${ARTIFACT_BUCKET}"

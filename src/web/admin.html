@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Fieldnote 管理画面</title>
+    <link rel="stylesheet" href="./admin.css" />
+  </head>
+  <body>
+    <main class="admin">
+      <header class="admin-header">
+        <div>
+          <p class="eyebrow">FIELDNOTE</p>
+          <h1>管理画面</h1>
+        </div>
+        <div id="actions" class="admin-actions" hidden>
+          <span id="updated" class="muted"></span>
+          <button id="refresh" type="button">更新</button>
+        </div>
+      </header>
+
+      <form id="login" class="login" hidden>
+        <label for="token">管理トークン</label>
+        <div class="login-row">
+          <input id="token" type="password" autocomplete="current-password" required />
+          <button type="submit">表示</button>
+        </div>
+        <p id="login-error" class="error-text" hidden></p>
+      </form>
+
+      <div id="dashboard" hidden>
+        <section class="cards" aria-label="概要">
+          <article class="card">
+            <h2>費用（概算、累計）</h2>
+            <p class="value" id="cost-total"></p>
+            <p class="sub" id="cost-detail"></p>
+          </article>
+          <article class="card">
+            <h2>直近のセッション</h2>
+            <p class="value" id="latest-cost"></p>
+            <p class="sub" id="latest-detail"></p>
+          </article>
+          <article class="card">
+            <h2>セッション</h2>
+            <p class="value" id="sessions-total"></p>
+            <p class="sub" id="sessions-detail"></p>
+          </article>
+          <article class="card">
+            <h2>平均応答時間</h2>
+            <p class="value" id="latency-average"></p>
+            <p class="sub" id="latency-detail"></p>
+          </article>
+          <article class="card">
+            <h2>ツールのエラー率</h2>
+            <p class="value" id="tool-rate"></p>
+            <p class="sub" id="tool-detail"></p>
+          </article>
+          <article class="card">
+            <h2>未完了のターン</h2>
+            <p class="value" id="turns-incomplete"></p>
+            <p class="sub">最終回答が返らずに止まった回</p>
+          </article>
+          <article class="card">
+            <h2>生成画像</h2>
+            <p class="value" id="images"></p>
+            <p class="sub">gemini-3.1-flash-image</p>
+          </article>
+          <article class="card">
+            <h2>トークン</h2>
+            <p class="value" id="tokens-total"></p>
+            <p class="sub" id="tokens-detail"></p>
+          </article>
+        </section>
+
+        <section>
+          <h2 class="section-title">セッション</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>開始</th>
+                  <th>状態</th>
+                  <th>最初の質問</th>
+                  <th class="num">ターン</th>
+                  <th class="num">費用</th>
+                  <th>ID</th>
+                </tr>
+              </thead>
+              <tbody id="session-rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section>
+          <h2 class="section-title">直近のエラー</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>時刻</th>
+                  <th>発生元</th>
+                  <th>内容</th>
+                  <th>セッション</th>
+                </tr>
+              </thead>
+              <tbody id="error-rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <p class="footnote">
+          費用は Vertex AI の定価（gemini-3.7-flash は入力 $0.75・出力 $3.75 / 100万トークン、画像は1枚 $0.067）からの概算です。実際の請求額は Cloud Billing で確認してください。
+        </p>
+      </div>
+    </main>
+    <script type="module" src="./admin.js"></script>
+  </body>
+</html>

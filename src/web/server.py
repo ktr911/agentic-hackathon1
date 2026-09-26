@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hmac
 import os
+import time
 import re
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
@@ -14,16 +16,21 @@ from typing import Any
 import google.auth
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.cloud import storage
+
+from admin import build_summary
 
 STATIC_DIR = Path(__file__).parent
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "")
 LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "asia-northeast1")
 AGENT_ENGINE_RESOURCE = os.getenv("AGENT_ENGINE_RESOURCE", "")
 ARTIFACT_BUCKET = os.getenv("ARTIFACT_BUCKET", "")
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
+ADMIN_SESSION_LIMIT = 200
+ADMIN_CACHE_SECONDS = 30
 _SAFE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._~-]{0,255}$")
 
 app = FastAPI(title="Fieldnote Agent web", docs_url=None, redoc_url=None)
@@ -231,6 +238,79 @@ async def get_artifact(
             }
         }
     )
+
+
+def _require_admin(request: Request) -> None:
+    if not ADMIN_TOKEN:
+        raise HTTPException(status_code=503, detail="ADMIN_TOKEN is not set")
+    supplied = request.headers.get("authorization", "").removeprefix("Bearer ")
+    if not hmac.compare_digest(supplied.encode(), ADMIN_TOKEN.encode()):
+        raise HTTPException(status_code=401, detail="Invalid admin token")
+
+
+async def _list_all(
+    client: httpx.AsyncClient, url: str, key: str, limit: int
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    params: dict[str, Any] = {"pageSize": 100}
+    while len(items) < limit:
+        response = await client.get(url, params=params)
+        if response.is_error:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+        payload = response.json()
+        items.extend(payload.get(key, []))
+        if not payload.get("nextPageToken"):
+            break
+        params["pageToken"] = payload["nextPageToken"]
+    return items[:limit]
+
+
+_admin_cache: tuple[float, dict[str, Any]] | None = None
+_admin_lock = asyncio.Lock()
+
+
+async def _collect_sessions() -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
+    token = await _access_token()
+    base = f"https://{LOCATION}-aiplatform.googleapis.com/v1beta1"
+    semaphore = asyncio.Semaphore(8)
+    async with httpx.AsyncClient(
+        timeout=60, headers={"Authorization": f"Bearer {token}"}
+    ) as client:
+        sessions = await _list_all(
+            client,
+            f"{base}/{AGENT_ENGINE_RESOURCE}/sessions",
+            "sessions",
+            ADMIN_SESSION_LIMIT,
+        )
+
+        async def with_events(session: dict[str, Any]):
+            async with semaphore:
+                events = await _list_all(
+                    client, f"{base}/{session['name']}/events", "sessionEvents", 2000
+                )
+            return session, events
+
+        return await asyncio.gather(*(with_events(session) for session in sessions))
+
+
+@app.get("/admin")
+async def admin_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "admin.html")
+
+
+@app.get("/api/admin/summary")
+async def admin_summary(request: Request, refresh: bool = False) -> dict[str, Any]:
+    _require_admin(request)
+    _require_configuration()
+    global _admin_cache
+    async with _admin_lock:
+        if (
+            refresh
+            or _admin_cache is None
+            or time.monotonic() - _admin_cache[0] > ADMIN_CACHE_SECONDS
+        ):
+            _admin_cache = (time.monotonic(), build_summary(await _collect_sessions()))
+        return _admin_cache[1]
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

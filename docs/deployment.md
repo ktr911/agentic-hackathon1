@@ -84,6 +84,16 @@ curl -H "Authorization: Bearer $(gcloud auth print-access-token)" \
 ログは Cloud Logging のほか、デプロイ時の Agent Runtime 出力が
 `.deploy/agent-engine-deploy.log` に残ります。
 
+## 管理画面
+
+`<Cloud Run URL>/admin` で、Agent Runtime のセッションを集計した管理画面を開けます。
+概算費用、セッション数、平均応答時間、ツールのエラー率、未完了のターン、生成画像数、
+トークン数と、セッション一覧・直近のエラーを表示します。
+
+ユーザーの質問文が見えるため、管理トークンで保護しています。トークンは初回デプロイ時に
+生成されて `.deploy/admin-token.txt` に保存され、Cloud Run の環境変数 `ADMIN_TOKEN` に
+設定されます。費用は Vertex AI の定価からの概算で、単価は `src/web/admin.py` にあります。
+
 ## ローカル確認
 
 Cloud Run 用サーバーは、デプロイ済み Agent Runtime のリソース名を指定して起動できます。
@@ -93,6 +103,7 @@ export GOOGLE_CLOUD_PROJECT=agentic-ai-hackathon-test1
 export GOOGLE_CLOUD_LOCATION=asia-northeast1
 export AGENT_ENGINE_RESOURCE='projects/PROJECT_NUMBER/locations/asia-northeast1/reasoningEngines/RESOURCE_ID'
 export ARTIFACT_BUCKET=agentic-ai-hackathon-test1-fieldnote-artifacts
+export ADMIN_TOKEN=local-admin-token  # 管理画面を使う場合
 
 uv run --with-requirements src/web/requirements.txt \
   uvicorn server:app --app-dir src/web --host 0.0.0.0 --port 8080

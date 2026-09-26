@@ -59,6 +59,8 @@ gcloud auth application-default login
 ./scripts/deploy.sh
 ```
 
+デプロイ後は `<Cloud Run URL>/admin` で管理画面（費用・セッション・エラーの集計）を開けます。
+
 既定の Google Cloud プロジェクトは `agentic-ai-hackathon-test1`、リージョンは
 `asia-northeast1` です。詳しくは [Google Cloud デプロイ手順](docs/deployment.md) を参照してください。
 
