@@ -5,15 +5,30 @@ import logging
 from typing import Any
 
 from google import genai
+from google.adk.tools import ToolContext
 from google.genai import types
 
-from ..config import MODEL, MODEL_LOCATION
+from ..config import FAST_THINKING, MODEL, MODEL_LOCATION
+from ..geology.tools import describe_legend, lookup_legend
 
 logger = logging.getLogger(__name__)
 
 
-def suggest_geo_tour_routes(
+# セッション state のキー。直近に生成したルート候補を保持し、深掘りや地図で使い回す。
+ROUTES_STATE_KEY = "tour_routes"
+_DEFAULT_LATITUDE = 35.0116
+_DEFAULT_LONGITUDE = 135.7681
+
+
+def _location_label(location: str | None) -> str:
+    if location and location.strip() and location != "指定なし":
+        return location
+    return "指定エリア"
+
+
+async def suggest_geo_tour_routes(
     location: str,
+    tool_context: ToolContext,
     geology_context: str | None = None,
     latitude: float | None = None,
     longitude: float | None = None,
@@ -27,18 +42,39 @@ def suggest_geo_tour_routes(
 
     Args:
         location: 調査対象の地域名。
+        tool_context: ADKが注入する現在のツール実行コンテキスト。
         geology_context: 地質調査エージェントから得られた地質特徴やレポートの要約。
         latitude: 中心地点または現在地の緯度。
         longitude: 中心地点または現在地の経度。
         duration_hours: 希望する観光所要時間（時間単位）。
     """
-    center_lat = latitude if latitude is not None else 35.0116
-    center_lng = longitude if longitude is not None else 135.7681
-    loc_str = (
-        location
-        if location and location.strip() and location != "指定なし"
-        else "指定エリア"
-    )
+    loc_str = _location_label(location)
+    cached = tool_context.state.get(ROUTES_STATE_KEY)
+    if isinstance(cached, dict) and cached.get("location") == loc_str:
+        return cached
+
+    center_lat = latitude if latitude is not None else _DEFAULT_LATITUDE
+    center_lng = longitude if longitude is not None else _DEFAULT_LONGITUDE
+    if not geology_context:
+        # 地質エージェントと並列に動くため、凡例だけを自分で引いて文脈にする。
+        legend = (await lookup_legend(center_lat, center_lng, tool_context.state)).get(
+            "legend"
+        )
+        geology_context = describe_legend(legend) if legend else None
+
+    data = await _generate_routes(loc_str, center_lat, center_lng, geology_context)
+    data["location"] = loc_str
+    tool_context.state[ROUTES_STATE_KEY] = data
+    return data
+
+
+async def _generate_routes(
+    loc_str: str,
+    center_lat: float,
+    center_lng: float,
+    geology_context: str | None,
+) -> dict[str, Any]:
+    """ルート候補を LLM で生成します。失敗時は地域名から組んだ定型案を返します。"""
     geo_str = geology_context if geology_context else "地域の段丘・地層・湧水・起伏"
 
     prompt = f"""
@@ -220,15 +256,16 @@ def suggest_geo_tour_routes(
     try:
         client = genai.Client(vertexai=True, location=MODEL_LOCATION)
         try:
-            response = client.models.generate_content(
+            response = await client.aio.models.generate_content(
                 model=MODEL.model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
+                    thinking_config=FAST_THINKING,
                 ),
             )
         finally:
-            client.close()
+            await client.aio.aclose()
         if response.text:
             data = json.loads(response.text)
             if isinstance(data, dict) and "route_options" in data:
@@ -444,8 +481,9 @@ def suggest_geo_tour_routes(
     }
 
 
-def plan_tour_route(
+async def plan_tour_route(
     location: str,
+    tool_context: ToolContext,
     latitude: float | None = None,
     longitude: float | None = None,
     theme: str | None = None,
@@ -461,6 +499,7 @@ def plan_tour_route(
 
     Args:
         location: 調査対象の地域名。
+        tool_context: ADKが注入する現在のツール実行コンテキスト。
         latitude: 中心地点または現在地の緯度。
         longitude: 中心地点または現在地の経度。
         theme: 観光のテーマ。
@@ -469,13 +508,17 @@ def plan_tour_route(
         geology_context: 地質特徴の要約。
         selected_route_id: 選択されたルートID（"A", "B", "C"）。
     """
-    multi = suggest_geo_tour_routes(
-        location=location,
-        geology_context=geology_context,
-        latitude=latitude,
-        longitude=longitude,
-        duration_hours=duration_hours,
-    )
+    # 深掘りは直前に提案したルートの続きなので、地域名の表記揺れがあっても再生成しない。
+    multi = tool_context.state.get(ROUTES_STATE_KEY)
+    if not isinstance(multi, dict) or not multi.get("route_options"):
+        multi = await suggest_geo_tour_routes(
+            location=location,
+            tool_context=tool_context,
+            geology_context=geology_context,
+            latitude=latitude,
+            longitude=longitude,
+            duration_hours=duration_hours,
+        )
 
     route_key = (
         selected_route_id.upper()
@@ -590,14 +633,19 @@ def plan_tour_route(
     }
 
 
-def get_tourism_report(
+async def get_tourism_report(
     location: str,
+    tool_context: ToolContext,
     latitude: float | None = None,
     longitude: float | None = None,
 ) -> dict[str, Any]:
     """指定地域の観光調査・ルートレポートを返します。"""
-    multi = suggest_geo_tour_routes(location, None, latitude, longitude)
-    single = plan_tour_route(location, latitude, longitude, selected_route_id="A")
+    multi = await suggest_geo_tour_routes(
+        location, tool_context, latitude=latitude, longitude=longitude
+    )
+    single = await plan_tour_route(
+        location, tool_context, latitude, longitude, selected_route_id="A"
+    )
 
     return {
         **single,
@@ -608,10 +656,11 @@ def get_tourism_report(
     }
 
 
-def get_mock_tourism_report(
+async def get_mock_tourism_report(
     location: str,
+    tool_context: ToolContext,
     latitude: float | None = None,
     longitude: float | None = None,
 ) -> dict[str, Any]:
     """後方互換用エイリアス"""
-    return get_tourism_report(location, latitude, longitude)
+    return await get_tourism_report(location, tool_context, latitude, longitude)

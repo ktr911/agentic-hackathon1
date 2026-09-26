@@ -8,33 +8,39 @@ from google.genai import types
 
 from ..config import IMAGE_MODEL, MODEL_LOCATION
 from ..geology.tools import get_geology_report
-from ..tour.tools import get_tourism_report, plan_tour_route
+from ..tour.tools import ROUTES_STATE_KEY, plan_tour_route
 
 
-def create_map_points(
+async def create_map_points(
     location: str,
+    tool_context: ToolContext,
     latitude: float | None = None,
     longitude: float | None = None,
     selected_route_id: str | None = None,
 ) -> dict[str, object]:
     """地質・観光の調査地点を、クライアント表示用にまとめます。
 
+    地質の凡例と観光ルートは、調査エージェントがセッションに残した結果を使うため、
+    調査の後に呼んでください。
+
     Args:
         location: 調査対象の地域名。
+        tool_context: ADKが注入する現在のツール実行コンテキスト。
         latitude: クライアントから渡された中心地点の緯度。
         longitude: クライアントから渡された中心地点の経度。
         selected_route_id: 選択されたルートID（"A", "B", "C"など）。
     """
-    geology = get_geology_report(location, latitude, longitude)
+    geology = await get_geology_report(location, tool_context, latitude, longitude)
     if selected_route_id:
-        tourism = plan_tour_route(
+        tourism = await plan_tour_route(
             location=location,
+            tool_context=tool_context,
             latitude=latitude,
             longitude=longitude,
             selected_route_id=selected_route_id,
         )
     else:
-        tourism = get_tourism_report(location, latitude, longitude)
+        tourism = tool_context.state.get(ROUTES_STATE_KEY) or {}
 
     return {
         "location": location,
@@ -46,14 +52,17 @@ def create_map_points(
     }
 
 
-def create_mock_map_points(
+async def create_mock_map_points(
     location: str,
+    tool_context: ToolContext,
     latitude: float | None = None,
     longitude: float | None = None,
     selected_route_id: str | None = None,
 ) -> dict[str, object]:
     """後方互換用エイリアス"""
-    return create_map_points(location, latitude, longitude, selected_route_id)
+    return await create_map_points(
+        location, tool_context, latitude, longitude, selected_route_id
+    )
 
 
 async def generate_image(prompt: str, tool_context: ToolContext) -> dict[str, object]:
