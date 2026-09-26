@@ -220,8 +220,26 @@ PY
     --header 'Content-Type: application/json' \
     --data "${SMOKE_PAYLOAD}" \
     "${WEB_URL}/run_sse" | tee "${STATE_DIR}/smoke-test.sse" >/dev/null
-  grep -q 'root_agent' "${STATE_DIR}/smoke-test.sse" || \
-    fail "E2E 応答に root_agent のイベントがありません。ログ: ${STATE_DIR}/smoke-test.sse"
+  python3 - "${STATE_DIR}/smoke-test.sse" <<'PY' || \
+    fail "E2E 応答が SSE 形式でないか、root_agent の最終回答がありません。ログ: ${STATE_DIR}/smoke-test.sse"
+import json
+import sys
+
+events = [
+    json.loads(line[len("data:"):])
+    for line in open(sys.argv[1], encoding="utf-8")
+    if line.startswith("data:")
+]
+sys.exit(
+    0
+    if any(
+        event.get("author") == "root_agent"
+        and any(part.get("text") for part in (event.get("content") or {}).get("parts") or [])
+        for event in events
+    )
+    else 1
+)
+PY
   echo "E2E smoke test: OK"
 else
   echo "SMOKE_TEST=${SMOKE_TEST} のためスキップしました"

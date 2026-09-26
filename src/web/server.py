@@ -121,9 +121,15 @@ async def create_session(app_name: str, user_id: str) -> Any:
 async def _close_stream(
     response: httpx.Response, client: httpx.AsyncClient
 ) -> AsyncIterator[bytes]:
+    """Re-frame Agent Runtime's newline-delimited JSON as SSE for the client."""
     try:
-        async for chunk in response.aiter_raw():
-            yield chunk
+        async for line in response.aiter_lines():
+            line = line.strip()
+            if not line:
+                continue
+            if not line.startswith("data:"):
+                line = f"data: {line}"
+            yield f"{line}\n\n".encode()
     finally:
         await response.aclose()
         await client.aclose()
