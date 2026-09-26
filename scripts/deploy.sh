@@ -10,6 +10,9 @@ WEB_SA_NAME="${WEB_SA_NAME:-fieldnote-web}"
 ARTIFACT_BUCKET="${ARTIFACT_BUCKET:-${PROJECT_ID}-fieldnote-artifacts}"
 ADK_VERSION="${ADK_VERSION:-2.8.0}"
 SMOKE_TEST="${SMOKE_TEST:-true}"
+# 変更した側だけデプロイする。Agent Runtime の更新は約7分、Cloud Run のビルドは約3分かかる。
+DEPLOY_AGENT="${DEPLOY_AGENT:-true}"
+DEPLOY_WEB="${DEPLOY_WEB:-true}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_DIR="${ROOT_DIR}/.deploy"
@@ -128,61 +131,71 @@ with open(path, "w", encoding="utf-8") as file:
 PY
 
 echo "[4/8] ADK エージェントを Agent Runtime にデプロイします"
-AGENT_ENGINE_ARGS=()
-if [[ -s "${RESOURCE_FILE}" ]]; then
-  EXISTING_RESOURCE="$(tr -d '[:space:]' < "${RESOURCE_FILE}")"
-  if [[ "${EXISTING_RESOURCE}" =~ /reasoningEngines/([0-9]+)$ ]]; then
-    AGENT_ENGINE_ARGS+=(--agent_engine_id="${BASH_REMATCH[1]}")
-    echo "既存リソースを更新します: ${EXISTING_RESOURCE}"
+if [[ "${DEPLOY_AGENT}" == "true" ]]; then
+  AGENT_ENGINE_ARGS=()
+  if [[ -s "${RESOURCE_FILE}" ]]; then
+    EXISTING_RESOURCE="$(tr -d '[:space:]' < "${RESOURCE_FILE}")"
+    if [[ "${EXISTING_RESOURCE}" =~ /reasoningEngines/([0-9]+)$ ]]; then
+      AGENT_ENGINE_ARGS+=(--agent_engine_id="${BASH_REMATCH[1]}")
+      echo "既存リソースを更新します: ${EXISTING_RESOURCE}"
+    fi
   fi
-fi
 
-DEPLOY_COMMAND=(
-  uvx
-  --from "google-adk==${ADK_VERSION}"
-  --with "google-cloud-aiplatform[adk,agent_engines]==2.1.0"
-  adk deploy agent_engine
-  --project="${PROJECT_ID}"
-  --region="${REGION}"
-  --display_name="${AGENT_DISPLAY_NAME}"
-  --description="地質情報と観光情報を統合する Fieldnote ADK agent"
-  --agent_engine_config_file="${CONFIG_FILE}"
-  --artifact_service_uri="gs://${ARTIFACT_BUCKET}"
-  --adk_version="${ADK_VERSION}"
-)
-if [[ ${#AGENT_ENGINE_ARGS[@]} -gt 0 ]]; then
-  DEPLOY_COMMAND+=("${AGENT_ENGINE_ARGS[@]}")
-fi
-DEPLOY_COMMAND+=("${ROOT_DIR}/src/agent")
+  DEPLOY_COMMAND=(
+    uvx
+    --from "google-adk==${ADK_VERSION}"
+    --with "google-cloud-aiplatform[adk,agent_engines]==2.1.0"
+    adk deploy agent_engine
+    --project="${PROJECT_ID}"
+    --region="${REGION}"
+    --display_name="${AGENT_DISPLAY_NAME}"
+    --description="地質情報と観光情報を統合する Fieldnote ADK agent"
+    --agent_engine_config_file="${CONFIG_FILE}"
+    --artifact_service_uri="gs://${ARTIFACT_BUCKET}"
+    --adk_version="${ADK_VERSION}"
+  )
+  if [[ ${#AGENT_ENGINE_ARGS[@]} -gt 0 ]]; then
+    DEPLOY_COMMAND+=("${AGENT_ENGINE_ARGS[@]}")
+  fi
+  DEPLOY_COMMAND+=("${ROOT_DIR}/src/agent")
 
-set +e
-"${DEPLOY_COMMAND[@]}" 2>&1 | tee "${LOG_FILE}"
-DEPLOY_STATUS=${PIPESTATUS[0]}
-set -e
-[[ ${DEPLOY_STATUS} -eq 0 ]] || fail "Agent Runtime のデプロイに失敗しました。ログ: ${LOG_FILE}"
+  set +e
+  "${DEPLOY_COMMAND[@]}" 2>&1 | tee "${LOG_FILE}"
+  DEPLOY_STATUS=${PIPESTATUS[0]}
+  set -e
+  [[ ${DEPLOY_STATUS} -eq 0 ]] || fail "Agent Runtime のデプロイに失敗しました。ログ: ${LOG_FILE}"
 
-AGENT_ENGINE_RESOURCE="$(grep -Eo "projects/[A-Za-z0-9-]+/locations/${REGION}/reasoningEngines/[0-9]+" "${LOG_FILE}" | tail -n 1 || true)"
-if [[ -z "${AGENT_ENGINE_RESOURCE}" && -n "${EXISTING_RESOURCE:-}" ]]; then
-  AGENT_ENGINE_RESOURCE="${EXISTING_RESOURCE}"
+  AGENT_ENGINE_RESOURCE="$(grep -Eo "projects/[A-Za-z0-9-]+/locations/${REGION}/reasoningEngines/[0-9]+" "${LOG_FILE}" | tail -n 1 || true)"
+  if [[ -z "${AGENT_ENGINE_RESOURCE}" && -n "${EXISTING_RESOURCE:-}" ]]; then
+    AGENT_ENGINE_RESOURCE="${EXISTING_RESOURCE}"
+  fi
+  [[ -n "${AGENT_ENGINE_RESOURCE}" ]] || fail "デプロイ結果から Agent Runtime のリソース名を取得できませんでした。"
+  printf '%s\n' "${AGENT_ENGINE_RESOURCE}" > "${RESOURCE_FILE}"
+else
+  [[ -s "${RESOURCE_FILE}" ]] || fail "DEPLOY_AGENT=false ですが ${RESOURCE_FILE} がありません。先に Agent Runtime をデプロイしてください。"
+  AGENT_ENGINE_RESOURCE="$(tr -d '[:space:]' < "${RESOURCE_FILE}")"
+  echo "DEPLOY_AGENT=false のためスキップしました（${AGENT_ENGINE_RESOURCE}）"
 fi
-[[ -n "${AGENT_ENGINE_RESOURCE}" ]] || fail "デプロイ結果から Agent Runtime のリソース名を取得できませんでした。"
-printf '%s\n' "${AGENT_ENGINE_RESOURCE}" > "${RESOURCE_FILE}"
 
 echo "[5/8] Cloud Run に Web クライアント/BFF をデプロイします"
-if [[ ! -s "${ADMIN_TOKEN_FILE}" ]]; then
-  (umask 077 && python3 -c 'import secrets; print(secrets.token_urlsafe(32))' > "${ADMIN_TOKEN_FILE}")
+if [[ "${DEPLOY_WEB}" == "true" ]]; then
+  if [[ ! -s "${ADMIN_TOKEN_FILE}" ]]; then
+    (umask 077 && python3 -c 'import secrets; print(secrets.token_urlsafe(32))' > "${ADMIN_TOKEN_FILE}")
+  fi
+  ADMIN_TOKEN="$(tr -d '[:space:]' < "${ADMIN_TOKEN_FILE}")"
+  gcloud run deploy "${WEB_SERVICE}" \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    --source="${ROOT_DIR}/src/web" \
+    --service-account="${WEB_SA}" \
+    --allow-unauthenticated \
+    --timeout=900 \
+    --max-instances=3 \
+    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${REGION},AGENT_ENGINE_RESOURCE=${AGENT_ENGINE_RESOURCE},ARTIFACT_BUCKET=${ARTIFACT_BUCKET},ADMIN_TOKEN=${ADMIN_TOKEN}" \
+    --quiet
+else
+  echo "DEPLOY_WEB=false のためスキップしました"
 fi
-ADMIN_TOKEN="$(tr -d '[:space:]' < "${ADMIN_TOKEN_FILE}")"
-gcloud run deploy "${WEB_SERVICE}" \
-  --project="${PROJECT_ID}" \
-  --region="${REGION}" \
-  --source="${ROOT_DIR}/src/web" \
-  --service-account="${WEB_SA}" \
-  --allow-unauthenticated \
-  --timeout=900 \
-  --max-instances=3 \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${REGION},AGENT_ENGINE_RESOURCE=${AGENT_ENGINE_RESOURCE},ARTIFACT_BUCKET=${ARTIFACT_BUCKET},ADMIN_TOKEN=${ADMIN_TOKEN}" \
-  --quiet
 
 echo "[6/8] Cloud Run URL を取得します"
 WEB_URL="$(gcloud run services describe "${WEB_SERVICE}" \
